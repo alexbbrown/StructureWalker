@@ -45,24 +45,25 @@
     // relies on caller invoking returned function using:
     // applyObjectArrayOtherF.call(context,a,b,c) to load this properly
     function applyObjectArrayOtherF(objF, arrayF, otherF) { 
-      return function applyObjectArrayOther(val) {
+      return function applyObjectArrayOther(val,iterator,context) {
       // map context is passed in as this
       return (_.isArray(val) ? arrayF:
                  _.isFunction(val) ? otherF:
                  _.isObject(val) ? objF:
-                   otherF)(val);
+                   otherF)(val,iterator,context);
     }}
     
     // Fallback map function if explicit object function is not provided:
     // recurses on every value of the object,  and return
     // the object constructed out of the results with the same keys
-    function mapObjectF(f) { return function mapObject(obj) {
-      return _.object(_.keys(obj), _.map(_.values(obj), f));      
+    function mapObjectF(f) { return function mapObject(obj,iterator,context) {
+      return _.object(_.keys(obj), _.map(obj, f, context));
     }}
 
     function filterWrap(f) {
-      return function(x) {
-        var res=f(x)
+      return function(x,iterator) {
+        var context=this
+        var res=f(x,iterator,context)
         return res ? _.isObject(res) ? res : x : undefined
       }
     }
@@ -76,15 +77,15 @@
     // if the default function is used, then the maplet inclusion test
     // is applied to each.  if no maplet function is supplied, then 
     // the value function is used instead, and will exclude the maplet.
-    function filterObjectF(f) {  return function mapObject(object) {
+    function filterObjectF(f) {  return function mapObject(obj, iterator, context) {
       // maplet picker
-      return cloneDefinedProperties(mapObjectF(filterWrap(f))(object))
+      return cloneDefinedProperties(mapObjectF(filterWrap(f))(obj, iterator, context))
     }}
 
     
     // Fallback map function if explicit array function is not provided:
-    function mapArrayF(f) { return function mapArray(obj) {
-      return _.map(obj, f);
+    function mapArrayF(f) { return function mapArray(obj,iterator,context) {
+      return _.map(obj, f,context);
     }}    
     
     function defined(x) {
@@ -92,15 +93,15 @@
     }
     
     // Fallback filter function if explicit array function is not provided:
-    function filterArrayF(f) { return function mapArray(array) {
+    function filterArrayF(f) { return function mapArray(array,iterator,context) {
       // first run the map and then eliminate undefined elements.
-      return _.filter(_.map(array, filterWrap(f)),defined);
+      return _.filter(_.map(array, filterWrap(f),context),defined);
     }}
     
     var mapValueF = identityF; // is this used?
     
-    function filterValueF(f) { return function filterValue(value) {
-      return f(value)?value:undefined; 
+    function filterValueF(f) { return function filterValue(value,iterator,context) {
+      return f(value,iterator,context)?value:undefined; 
     }}
   
     // The K combinator.  Probably want to export this.
@@ -124,9 +125,27 @@
         .postObject(this.cleanEmptyObject)
     }
     
-    function walk(structure) {
+    // Co-map causes the context to be iterated over 
+    // in lock-step with the primary structure.
+    // Note that this cannot be undone, and should be 
+    // done AFTER setting the object/array etc functions
+    function coMap() {
+      return this
+        .preArray(function(f,x,i,c){
+          return f(x,i,i?c[i]:c)
+        })
+        .preObject(function(f,x,i,c){
+          return f(x,i,i?c[i]:c)
+        })
+    }
+    
+    function walk(structure,iterator,context) {
+      if (arguments.length==2) {
+        context=iterator;
+        iterator=undefined;
+      }
       return applyObjectArrayOtherF(
-        objectFn,arrayFn,otherFn)(structure);
+        objectFn,arrayFn,otherFn)(structure,iterator,context);
     }
     
     walk.map = walk;
@@ -137,6 +156,8 @@
     
     walk.filterClean = filterClean;
     
+    walk.coMap = coMap;
+    
     walk.object = function(newObjectFn) {
       objectFn = newObjectFn;
       return walk;
@@ -144,7 +165,13 @@
 
     walk.postObject = function(postObjectFn) {
       var oldObjectFn = objectFn
-      objectFn = function(x){return postObjectFn(oldObjectFn(x))}
+      objectFn = function(x,i,c){return postObjectFn(oldObjectFn(x,i,c))}
+      return walk;
+    }
+    
+    walk.preObject = function(preObjectFn) {
+      var oldObjectFn = objectFn
+      objectFn = function(x,i,c){return preObjectFn(oldObjectFn,x,i,c)}
       return walk;
     }
 
@@ -155,7 +182,13 @@
     
     walk.postArray = function(postArrayFn) {
       var oldArrayFn = arrayFn
-      arrayFn = function(x){return postArrayFn(oldArrayFn(x))}
+      arrayFn = function(x,i,c){return postArrayFn(oldArrayFn(x,i,c))}
+      return walk;
+    }
+    
+    walk.preArray = function(preArrayFn) {
+      var oldArrayFn = arrayFn
+      arrayFn = function(x,i,c){return preArrayFn(oldArrayFn,x,i,c)}
       return walk;
     }
     
