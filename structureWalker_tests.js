@@ -208,4 +208,111 @@ assert.deepEqual(structureWalker()
                  undefined)
 
 
+// TESTING filterreduce - if any true, leave structure intact.
+assert.deepEqual(structureWalker()
+                 .filterClean()
+                 .other(function(x){return x=="A"})
+                 .walk(["A", ["B"]]),
+                 ["A"])
+
+assert.deepEqual(structureWalker()
+                 .filterClean()
+                 .other(function(x){return x=="A"})
+                 .walk(["B", ["A"]]),
+                 [["A"]])
+
+assert.deepEqual(structureWalker()
+                 .filterClean()
+                 .other(function(x){return x=="A"})
+                 .walk(["B", ["C"]]),
+                 undefined)
+
+// Testing Co-map
+assert.deepEqual(structureWalker()
+                 .filterClean()
+                 .other(function(x,i,c){
+                   return x==c}
+                   )
+                 .walk("B",undefined,"B"),
+                 true)
+
+assert.deepEqual(structureWalker()
+                 .filterClean()
+                 .other(function(x,i,c){
+                   return x==c[i]
+                   
+                 })
+                 .walk(["alex", "b"],undefined,["alex", ["C"]]),
+                 ["alex"])
+
+
+assert.deepEqual(structureWalker()
+                 .filterClean()
+                 .preArray(function(f,x,i,c){
+                   return f(x,i,_.isUndefined(i)?c:c[i])
+                 })
+                 .other(function(x,i,c){
+                   return x==c[i]
+                   
+                 })
+                 .walk(["alex", ["zoo"]],undefined,["alex", ["zoo"]]),
+                 ["alex", ["zoo"]])
+
+
+
+assert.deepEqual(structureWalker()
+                 .filterClean()
+                 .preArray(function(f,x,i,c){
+                   return f(x,i,_.isUndefined(i)?c:c[i])
+                 })
+                 .other(function(x,i,c){
+                   return x==c[i]
+                   
+                 })
+                 .walk({name:"bob", owns:["zoo"]},undefined,{name:"bob", owns:["zoo"]}),
+                 {name:"bob", owns:["zoo"]})
+                 
+assert.deepEqual(structureWalker()
+                 .filterClean()
+                 .preArray(function(f,x,i,c){
+                   return f(x,i,_.isUndefined(i)?c:c[i])
+                 })
+                 .other(function(x,i,c){
+                   return x==c[i]
+                   
+                 })
+                 .walk({name:"alex", owns:["zoo"]},undefined,{name:"joe", owns:["zoo"]}),
+                 {owns:["zoo"]})
+            
+assert.deepEqual(structureWalker()
+                 .filterClean()
+                 .preArray(function(f,x,i,c){
+                   return f(x,i,_.isUndefined(i)?c:c[i])
+                 })
+                 .preObject(function(f,x,i,c){
+                   return f(x,i,_.isUndefined(i)?c:c[i])
+                 })
+                 .other(function(x,i,c){
+                   return x==c[i]
+                   
+                 })
+                 .walk({name:"alex", owns:{thing: "zoo"}},undefined,{name:"joe", owns:{thing:"zoo"}}),
+                 {owns:{thing: "zoo"}})
+                 
+// using co-map sugar
+                 assert.deepEqual(structureWalker()
+                 .filterClean()
+                 .coMap()
+                 .other(function(x,i,c){
+                   return x==c[i]
+                   
+                 })
+                 .walk({name:"alex", owns:{thing: "zoo"}},{name:"joe", owns:{thing:"zoo"}}),
+                 {owns:{thing: "zoo"}})
+
+// reduce implemented using filter
+// test for ANY passing:
+
+
+
 // TESTING REDUCE
